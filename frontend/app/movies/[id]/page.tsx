@@ -1,0 +1,9 @@
+import Link from "next/link";
+import { SiteNav } from "../../components/site-nav";
+import { films, locations } from "../../lib/demo-data";
+
+export default async function MoviePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const film = films.find((item) => item.id === Number(id)) ?? films[0];
+  return <main className="inner-page"><SiteNav action="Add to favourites" href="/favourites" /><section className="film-hero" style={{ backgroundImage: `linear-gradient(90deg, #171d1a 20%, rgba(23,29,26,.56)), url(${film.image})` }}><div className="inner-shell"><p className="eyebrow">{film.type} · {film.year}</p><h1>{film.title}</h1><p className="film-description">A cinematic journey, rooted in real landscapes. Explore the places where the story stepped beyond the frame.</p><div className="film-meta"><span>2h 41m</span><span>Drama · Adventure</span><span>{film.count} verified locations</span></div></div></section><section className="inner-shell content-section"><div className="content-heading"><div><p className="eyebrow">FILMING LOCATIONS</p><h2>Follow the <i>footsteps.</i></h2></div><Link className="button dark" href="/explore">View on map <span>→</span></Link></div><div className="location-detail-grid">{locations.slice(0, 3).map((location, index) => <article className="detail-location" key={location.id}><div className="detail-image" style={{ backgroundImage: `url(${location.image})` }} /><div><p className="location-number">0{index + 1} · {location.city.toUpperCase()}</p><h3>{location.name}</h3><p>{index === 0 ? "The camera found a little piece of history here—an unforgettable setting for a key moment in the story." : "A real-world setting that gave the scene its sense of scale and place."}</p><Link href={`/locations/${location.id}`}>Explore location →</Link></div></article>)}</div></section></main>;
+}
