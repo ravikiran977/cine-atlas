@@ -1,0 +1,113 @@
+// use prisma-8
+// CineAtlas database contract
+// Prisma 8 / PostgreSQL
+model User {
+  id          Int                        @id @default(autoincrement())
+  email       String                     @unique
+  username    String?                    @unique
+  name        String?
+  passwordHash String?
+  role        String                     @default("USER")
+  profileImage String?
+  bio         String?
+  createdAt   TimestamptzString          @default(now())
+  updatedAt   temporal.updatedAtString()
+
+  submissions LocationSubmission[]
+}
+
+model Movie {
+  id            Int                        @id @default(autoincrement())
+  title         String
+  originalTitle String?
+  overview      String?
+  releaseDate   String?
+  posterPath    String?
+  backdropPath  String?
+  tmdbId        Int?                       @unique
+
+  createdAt     TimestamptzString          @default(now())
+  updatedAt     temporal.updatedAtString()
+
+  locations     MovieLocation[]
+  actors        MovieActor[]
+}
+
+model Actor {
+  id          Int                        @id @default(autoincrement())
+  name        String
+  profilePath String?
+  tmdbId      Int?                       @unique
+
+  createdAt   TimestamptzString          @default(now())
+  updatedAt   temporal.updatedAtString()
+
+  movies      MovieActor[]
+}
+
+model Location {
+  id          Int                        @id @default(autoincrement())
+  name        String
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  latitude    Float
+  longitude   Float
+  description String?
+
+  createdAt   TimestamptzString          @default(now())
+  updatedAt   temporal.updatedAtString()
+
+  movies      MovieLocation[]
+  submissions LocationSubmission[]
+}
+
+model MovieLocation {
+  id               Int               @id @default(autoincrement())
+  movieId          Int
+  locationId       Int
+  sceneDescription String?
+  filmingDate      String?
+  notes            String?
+
+  movie            Movie             @relation(fields:[movieId], references:[id])
+  location         Location          @relation(fields:[locationId], references:[id])
+
+  createdAt        TimestamptzString @default(now())
+
+  @@unique([movieId, locationId])
+}
+
+model MovieActor {
+  id            Int     @id @default(autoincrement())
+  movieId       Int
+  actorId       Int
+  characterName String?
+
+  movie         Movie   @relation(fields:[movieId], references:[id])
+  actor         Actor   @relation(fields:[actorId], references:[id])
+
+  @@unique([movieId, actorId])
+}
+
+model LocationSubmission {
+  id          Int                        @id @default(autoincrement())
+  userId      Int
+  locationId  Int?
+  name        String
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  latitude    Float
+  longitude   Float
+  description String?
+  status      String                     @default("PENDING")
+
+  user        User                       @relation(fields:[userId], references:[id])
+  location    Location?                  @relation(fields:[locationId], references:[id])
+
+  createdAt   TimestamptzString          @default(now())
+  updatedAt   temporal.updatedAtString()
+}
