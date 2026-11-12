@@ -3,10 +3,13 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { db } from "../prisma/db.js";
 import { searchTmdb } from "./services/tmdb.js";
+import { authRouter } from "./routes/auth.routes.js";
 
 dotenv.config();
 const app = express();
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000" }));
+const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+app.use(cors({ origin: clientUrl, credentials: true }));
+app.options("/{*splat}", cors({ origin: clientUrl, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
 const success = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data });
@@ -37,6 +40,7 @@ async function locationName(latitude: number, longitude: number) {
 }
 
 app.get("/api/health", (_req, res) => success(res, { message: "CineAtlas API is running" }));
+app.use("/api/auth", authRouter);
 app.get("/api/reverse-geocode", async (req, res, next) => { try { const latitude = Number(req.query.lat); const longitude = Number(req.query.lng); if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return res.status(400).json({ success: false, message: "Valid lat and lng query parameters are required" }); success(res, { name: await locationName(latitude, longitude) }); } catch (error) { next(error); } });
 app.get("/api/movies", async (req, res, next) => { try { const page = positiveInt(req.query.page, 1, 1_000_000); const limit = positiveInt(req.query.limit, 20, 100); const items = await db.orm.public.Movie.orderBy((movie) => movie.createdAt.desc()).offset((page - 1) * limit).limit(limit).all(); success(res, { items, page, limit }); } catch (error) { next(error); } });
 app.get("/api/movies/:id", async (req, res, next) => { try { const movie = await db.orm.public.Movie.include("locations", (link) => link.include("location", (location) => location)).first({ id: Number(req.params.id) }); if (!movie) return res.status(404).json({ success: false, message: "Movie not found" }); success(res, movie); } catch (error) { next(error); } });
@@ -45,6 +49,12 @@ app.get("/api/locations/:id", async (req, res, next) => { try { const location =
 app.get("/api/search", async (req, res, next) => { try { const query = typeof req.query.q === "string" ? req.query.q.trim() : ""; if (query.length < 2) return success(res, { movies: [], locations: [] }); const pattern = `%${query}%`; const [movies, locations] = await Promise.all([db.orm.public.Movie.where((movie) => movie.title.ilike(pattern)).limit(10).all(), db.orm.public.Location.where((location) => location.name.ilike(pattern)).limit(10).all()]); success(res, { movies, locations }); } catch (error) { next(error); } });
 app.get("/api/movie-suggestions", async (req, res, next) => { try { const query = typeof req.query.q === "string" ? req.query.q.trim() : ""; if (query.length < 2) return success(res, { items: [], source: "none" }); const tmdbItems = await searchTmdb(query); if (tmdbItems) return success(res, { items: tmdbItems, source: "tmdb" }); const pattern = `%${query}%`; const movies = await db.orm.public.Movie.where((movie) => movie.title.ilike(pattern)).limit(10).all(); success(res, { items: movies.map((movie) => ({ tmdbId: movie.tmdbId, title: movie.title, overview: movie.overview || "", releaseDate: movie.releaseDate, posterUrl: movie.posterPath, type: "MOVIE" })), source: "local" }); } catch (error) { next(error); } });
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found" }));
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => { console.error("API error", error); res.status(500).json({ success: false, message: "An unexpected server error occurred" }); });
+app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("API error", error);
+  const message = error instanceof Error && error.message.startsWith("Authentication is not configured:")
+    ? error.message
+    : "An unexpected server error occurred";
+  res.status(500).json({ success: false, message });
+});
 const port = Number(process.env.PORT || 5000);
 app.listen(port, () => console.log(`CineAtlas API running on http://localhost:${port}`));
